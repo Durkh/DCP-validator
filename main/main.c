@@ -22,7 +22,7 @@ void app_main(void){
     //unsigned char msg[] = "egidio neto da computacao";
 
     DCP_MODE mode;
-    mode.addr = 1;
+    mode.addr = 0xFF;
     mode.flags.flags = FLAG_Instant;
     mode.isController = true;
     mode.speed = SLOW;
