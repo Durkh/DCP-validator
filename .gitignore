@@ -1,11 +1,10 @@
 *.cache/
 **/build/**
 
-*sdkconfig*
-
 *.cmake
 
-ESP32C3/managed_components/
+sdkconfig.*
+managed_components/
 *.lock
 
 *.swp
