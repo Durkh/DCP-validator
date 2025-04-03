@@ -38,6 +38,7 @@ void app_main(void){
 
     while(1){
 
+        /*
         DCP_Data_t Tx = {.data = (uint8_t*)malloc(sizeof(struct DCP_Message_Generic_t) + strlen((char*)msg)+1 + sizeof(uint8_t))};
 
         Tx.message->type = strlen((char*)msg)+3;
@@ -48,6 +49,7 @@ void app_main(void){
         SendMessage(Tx);
 
         vTaskDelay(pdMS_TO_TICKS(100));
+        */
 
         Rx = ReadMessage();
 
@@ -58,7 +60,7 @@ void app_main(void){
             Rx = NULL;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
 }
