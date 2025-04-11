@@ -77,10 +77,12 @@
 
         .failure-details {
             margin-bottom: 20px;
+            display: none;
         }
 
         .failure-details h2 {
             font-size: 18px;
+            color: #721c24;
         }
 
         .failure-details ol {
@@ -166,6 +168,18 @@
             margin-top: 5px;
         }
 
+        .side-by-side-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            width: 100%;
+            clear: both;
+        }
+
+        .table-container {
+            width: 48%;
+        }
+
         /* Hide buttons when printing */
         @media print {
             .button-container, #loading-indicator, .notification, .note {
@@ -213,25 +227,12 @@
                 <option value="64 MHz">64 MHz</option>
             </select>
         </div>
-        <p class="note">* Required fields for fetching data</p>
+        <p class="note">* Required fields for validation</p>
     </div>
 
     <div id="loading-indicator">
         <div class="spinner"></div> Loading data...
     </div>
-
-    <h2>Electrical Information</h2>
-    <table id="electrical-info-table">
-        <thead>
-            <tr>
-                <th>Parameter</th>
-                <th>Value</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- This will be populated with placeholders initially -->
-        </tbody>
-    </table>
 
     <h2>Specification Conformity</h2>
     <table id="spec-conformity-table">
@@ -244,14 +245,41 @@
             </tr>
         </thead>
         <tbody>
-            <!-- This will be populated with placeholders initially -->
         </tbody>
     </table>
 
+    <div class="side-by-side-container">
+        <div class="table-container">
+            <h2>Transmission Information</h2>
+            <table id="transmission-info-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="table-container">
+            <h2>Electrical Information</h2>
+            <table id="electrical-info-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
     <div class="failure-details">
         <h2>Failure Details</h2>
         <ol id="failure-list">
-            <!-- This will be populated with placeholders initially -->
         </ol>
     </div>
 
@@ -262,17 +290,17 @@
 
     <script>
         // Set current date
-        const today = new Date();
-        const dateStr = today.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-        document.getElementById('date-of-emission').textContent = `DCP-IF Date of Emission: ${dateStr}`;
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const dateStr = today.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            document.getElementById('date-of-emission').textContent = `DCP-IF Date of Emission: ${dateStr}`;
         });
     </script>
-
-    <script src="../src/result.js" ></script>
-    <script src="../src/buttons.js" ></script>
+    <script type="module" src="../src/result.js"></script>
+    <script type="module" src="../src/buttons.js"></script>
 </body>
 </html>

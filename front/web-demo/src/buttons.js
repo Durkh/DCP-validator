@@ -1,4 +1,4 @@
-import {fetchReportData, populateDefaultValues} from "result.js"
+import {fetchReportData, populateDefaultValues} from "../src/result.js";
 
 // Event listener for download PDF button
 document.getElementById('print-button').addEventListener('click', function() {
@@ -14,7 +14,7 @@ document.getElementById('device-type').addEventListener('input', function() {
 
     const deviceType = document.getElementById('device-type').value;
     const deviceSpeed = document.getElementById('device-speed').value;
-    
+
     if (deviceType !== "Selecione" && deviceSpeed !== "Selecione") {
         populateDefaultValues();
     }
@@ -24,7 +24,7 @@ document.getElementById('device-speed').addEventListener('input', function() {
 
     const deviceType = document.getElementById('device-type').value;
     const deviceSpeed = document.getElementById('device-speed').value;
-    
+
     if (deviceType !== "Selecione" && deviceSpeed !== "Selecione") {
         populateDefaultValues();
     }
