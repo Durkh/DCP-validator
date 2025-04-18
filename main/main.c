@@ -19,10 +19,8 @@ void SanityCheck(unsigned const int size, uint8_t const msg[]){
 
 void app_main(void){
 
-    //unsigned char msg[] = "egidio neto da computacao";
-
     DCP_MODE mode;
-    mode.addr = 0xFF;
+    mode.addr = 0xA;
     mode.flags.flags = FLAG_Instant;
     mode.isController = true;
     mode.speed = SLOW;
@@ -34,22 +32,24 @@ void app_main(void){
 
     struct DCP_Message_t* Rx = NULL;
 
-    const unsigned char msg[] = "egidio";
+    struct DCP_Message_t msg = {
+        .type = 0,
+        .L3 = (struct DCP_Message_L3_t){
+            .IDS = 0xA,
+            .IDD = 0xF0,
+            .COD = 0x1,
+            .data = {0xC, 0xA, 0xF, 0xE},
+            .PAD = 0x0
+        }
+    };
 
     while(1){
 
-        /*
-        DCP_Data_t Tx = {.data = (uint8_t*)malloc(sizeof(struct DCP_Message_Generic_t) + strlen((char*)msg)+1 + sizeof(uint8_t))};
-
-        Tx.message->type = strlen((char*)msg)+3;
-        Tx.message->generic.addr = mode.addr;
-        memcpy(Tx.message->generic.payload, msg, strlen((char*)msg)+1);
-        SanityCheck(Tx.message->type, Tx.data);
-
+        DCP_Data_t Tx = (DCP_Data_t){.data = malloc(sizeof (struct DCP_Message_t))};
+        memcpy((void*)Tx.message, &msg, sizeof msg);
         SendMessage(Tx);
 
         vTaskDelay(pdMS_TO_TICKS(100));
-        */
 
         Rx = ReadMessage();
 
