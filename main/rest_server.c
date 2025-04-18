@@ -15,6 +15,9 @@
 #include "esp_vfs.h"
 #include "cJSON.h"
 
+#include "DCP.h"
+#include "validator.h"
+
 static const char *REST_TAG = "esp-rest";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
     do                                                                                 \
@@ -106,23 +109,31 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-/* Simple handler for light brightness control */
-static esp_err_t light_brightness_post_handler(httpd_req_t *req)
+void AddToJSON(cJSON* root, char const * name, const float value){
+    cJSON *JSONvalue = cJSON_CreateNumber(value);
+    cJSON_AddItemToObject(root, name, JSONvalue);
+}
+
+/* Simple handler for getting system handler */
+static esp_err_t system_info_get_handler(httpd_req_t *req)
 {
     int total_len = req->content_len;
     int cur_len = 0;
+
     char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
     int received = 0;
+
     if (total_len >= SCRATCH_BUFSIZE) {
         /* Respond with 500 Internal Server Error */
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
         return ESP_FAIL;
     }
+
     while (cur_len < total_len) {
         received = httpd_req_recv(req, buf + cur_len, total_len);
         if (received <= 0) {
             /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post device data");
             return ESP_FAIL;
         }
         cur_len += received;
@@ -130,41 +141,167 @@ static esp_err_t light_brightness_post_handler(httpd_req_t *req)
     buf[total_len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
-    int red = cJSON_GetObjectItem(root, "red")->valueint;
-    int green = cJSON_GetObjectItem(root, "green")->valueint;
-    int blue = cJSON_GetObjectItem(root, "blue")->valueint;
-    ESP_LOGI(REST_TAG, "Light control: red = %d, green = %d, blue = %d", red, green, blue);
-    cJSON_Delete(root);
-    httpd_resp_sendstr(req, "Post control value successfully");
-    return ESP_OK;
-}
+    if(!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid request");
+        return ESP_FAIL;
+    }
 
-/* Simple handler for getting system handler */
-static esp_err_t system_info_get_handler(httpd_req_t *req)
-{
-    httpd_resp_set_type(req, "application/json");
-    cJSON *root = cJSON_CreateObject();
-    esp_chip_info_t chip_info;
-    esp_chip_info(&chip_info);
-    cJSON_AddStringToObject(root, "version", IDF_VER);
-    cJSON_AddNumberToObject(root, "cores", chip_info.cores);
-    const char *sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
-    free((void *)sys_info);
     cJSON_Delete(root);
-    return ESP_OK;
-}
 
-/* Simple handler for getting temperature data */
-static esp_err_t temperature_data_get_handler(httpd_req_t *req)
-{
+    bool isController = cJSON_IsTrue(cJSON_GetObjectItem(root, "isController"));
+    int deviceSpeed = cJSON_GetObjectItem(root, "deviceSpeed")->valueint;
+
+    unsigned busSpeed = SLOW;
+    switch(deviceSpeed){
+        case 4:  busSpeed = SLOW;  break;
+        case 20: busSpeed = FAST1; break;
+        case 32: busSpeed = FAST2; break;
+        case 64: busSpeed = ULTRA; break;
+        default: break;
+    }
+
+    const DCP_MODE mode = {.addr = 0xFF, .flags.flags = FLAG_Instant, .isController = isController, .speed = busSpeed};
+    const gpio_num_t pin = 1;
+
+    if (!DCPInit(pin, mode)){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not init bus");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(REST_TAG, "Performing validation");
+
+    //performing validation
+    struct DCP_electrical_t electrical = MeasureElectrical(pin);
+    ESP_LOGV("[validation]", "VIH: %f\tVIL: %f\trise: %f\tfall: %f\tcycle: %f\tspeed: %f",
+        electrical.VIH, electrical.VIL, electrical.rise, electrical.falling, electrical.cycle, electrical.speed);
+
+    struct DCP_Transmission_t transmission = TestConnection(pin);
+    ESP_LOGV("[validation]", "error: 0x%X", transmission.errors);
+    struct DCP_timings_t timings = GetTimes(pin);
+    ESP_LOGV("[validation]", "sync: %f\tBS_low: %f\tBS_high: %f\tbit0: %f\tbit1: %f",
+        timings.sync, timings.bitSync_low, timings.bitSync_high, timings.bit0, timings.bit1);
+
+    enum Collision_e yield = DoesYield(pin);
+    ESP_LOGV("[validation]", "yield: %d", yield);
+
+    //sending result
     httpd_resp_set_type(req, "application/json");
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "raw", esp_random() % 20);
-    const char *sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
-    free((void *)sys_info);
+
+    root = cJSON_CreateObject();
+
+    //populate specConformity
+    cJSON* JSON_specConf = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "specConformity", JSON_specConf);
+
+    AddToJSON(JSON_specConf, "Speed", timings.speed);
+    AddToJSON(JSON_specConf, "Bit High Time", timings.bit1);
+    AddToJSON(JSON_specConf, "Bit Low Time", timings.bit0);
+    AddToJSON(JSON_specConf, "Sync Time", timings.sync);
+    AddToJSON(JSON_specConf, "Bit Sync Time", timings.bitSync_low+timings.bitSync_high);
+    AddToJSON(JSON_specConf, "Bit Sync High", timings.bitSync_high);
+    AddToJSON(JSON_specConf, "Bit Sync Low", timings.bitSync_low);
+    AddToJSON(JSON_specConf, "Bus Yield", yield == COL_false);
+
+    //populate electricalInfo
+    cJSON* JSON_elec = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "electricalInfo", JSON_elec);
+
+    AddToJSON(JSON_elec, "VIH", electrical.VIH);
+    AddToJSON(JSON_elec, "VIL", electrical.VIL);
+    AddToJSON(JSON_elec, "Rise Time", electrical.rise);
+    AddToJSON(JSON_elec, "Falling Time", electrical.falling);
+    AddToJSON(JSON_elec, "Cycle Time", electrical.rise + electrical.falling);
+    AddToJSON(JSON_elec, "Bus Max Speed", electrical.speed);
+
+    //populate transmissionInfo
+    cJSON* item;
+    cJSON* JSON_transmission = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "transmissionInfo", JSON_transmission);
+    AddToJSON(JSON_transmission, "Transmission Type", transmission.type);
+    
+    //sync bitsync size
+    if(transmission.errors & (ERROR_sync_inf | ERROR_sync_tooLong | ERROR_sync_tooShort)){
+        item  = cJSON_CreateObject();
+        cJSON_AddItemToObject(JSON_transmission, "Sync", item);
+        cJSON_AddItemToObject(item, "status", cJSON_CreateFalse());
+
+        switch (transmission.errors){
+            case ERROR_sync_inf:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Infinite sync signal"));
+            break;
+            case ERROR_sync_tooLong:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too long"));
+            break;
+            case ERROR_sync_tooShort:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too short"));
+            break;
+            default:
+        }
+    }else {
+        item  = cJSON_CreateObject();
+        cJSON_AddItemToObject(JSON_transmission, "BitSync", item);
+        cJSON_AddItemToObject(item, "status", cJSON_CreateTrue());
+    }
+
+    if(transmission.errors & (ERROR_bitSync_inf | ERROR_bitSync_tooLong | ERROR_bitSync_tooShort | ERROR_bitSync_invalidLow)){
+        item  = cJSON_CreateObject();
+        cJSON_AddItemToObject(JSON_transmission, "BitSync", item);
+        cJSON_AddItemToObject(item, "status", cJSON_CreateFalse());
+
+        switch (transmission.errors){
+            case ERROR_bitSync_inf:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Infinite bitsync signal"));
+            break;
+            case ERROR_bitSync_tooLong:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("BitSync signal too long"));
+            break;
+            case ERROR_bitSync_tooShort:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("BitSync signal too short"));
+            break;
+            case ERROR_bitSync_invalidLow:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("BitSync signal with invalid low"));
+            break;
+            default:
+        }
+    }else {
+        item  = cJSON_CreateObject();
+        cJSON_AddItemToObject(JSON_transmission, "Sync", item);
+        cJSON_AddItemToObject(item, "status", cJSON_CreateTrue());
+    }
+
+    item  = cJSON_CreateObject();
+    cJSON_AddItemToObject(JSON_transmission, "Size", item);
+    cJSON_AddItemToObject(item, "status", cJSON_CreateBool(!(transmission.errors & ERROR_invalidSize)));
+
+    if(transmission.errors & (ERROR_message_invalidL3_header | ERROR_message_invalidL3_sID | ERROR_message_invalidL3_padding | ERROR_message_invalidL3_CRC)){
+        item  = cJSON_CreateObject();
+        cJSON_AddItemToObject(JSON_transmission, "L3", item);
+        cJSON_AddItemToObject(item, "status", cJSON_CreateFalse());
+
+        switch (transmission.errors){
+            case ERROR_sync_inf:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Infinite sync signal"));
+            break;
+            case ERROR_sync_tooLong:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too long"));
+            break;
+            case ERROR_sync_tooShort:
+            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too short"));
+            break;
+            default:
+        }
+    }else {
+        item  = cJSON_CreateObject();
+        cJSON_AddItemToObject(JSON_transmission, "Sync", item);
+        cJSON_AddItemToObject(item, "status", cJSON_CreateTrue());
+    }
+
+    const char *validationResult = cJSON_Print(root);
+    httpd_resp_sendstr(req, validationResult);
+    free((void *)validationResult);
+
     cJSON_Delete(root);
+
     return ESP_OK;
 }
 
@@ -184,30 +321,12 @@ esp_err_t start_rest_server(const char *base_path)
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-        .uri = "/api/v1/system/info",
-        .method = HTTP_GET,
+        .uri = "/api/v1/validation",
+        .method = HTTP_POST,
         .handler = system_info_get_handler,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
-
-    /* URI handler for fetching temperature data */
-    httpd_uri_t temperature_data_get_uri = {
-        .uri = "/api/v1/temp/raw",
-        .method = HTTP_GET,
-        .handler = temperature_data_get_handler,
-        .user_ctx = rest_context
-    };
-    httpd_register_uri_handler(server, &temperature_data_get_uri);
-
-    /* URI handler for light brightness control */
-    httpd_uri_t light_brightness_post_uri = {
-        .uri = "/api/v1/light/brightness",
-        .method = HTTP_POST,
-        .handler = light_brightness_post_handler,
-        .user_ctx = rest_context
-    };
-    httpd_register_uri_handler(server, &light_brightness_post_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

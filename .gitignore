@@ -7,4 +7,5 @@ sdkconfig.*
 managed_components/
 *.lock
 
+.vscode
 *.swp

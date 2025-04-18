@@ -14,6 +14,8 @@ enum e_Flags {
     FLAG_Assynchronous  = 0b1
 };
 
+enum DCP_Speed_e {SLOW = 0, FAST1, FAST2, ULTRA};
+
 typedef struct DCP_MODE{
     uint8_t addr;
     union{
@@ -21,7 +23,7 @@ typedef struct DCP_MODE{
         unsigned int flags; //TODO change var size?
     } flags;
     bool isController;
-    enum {SLOW = 0, FAST1, FAST2, ULTRA} speed;
+    enum DCP_Speed_e speed;
 }DCP_MODE;
 
 bool DCPInit(const unsigned int busPin, const DCP_MODE mode);
