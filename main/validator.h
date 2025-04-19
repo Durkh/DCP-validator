@@ -21,7 +21,7 @@ enum DCP_Errors_e {
     ERROR_message_invalidL3_sID = 1UL << 11,
     ERROR_message_invalidL3_padding = 1UL << 12,
     ERROR_message_invalidL3_CRC = 1UL << 13,
-    ERROR_internal = 1UL << 32
+    ERROR_internal = 1UL << 31
 };
 
 struct DCP_Transmission_t {
@@ -51,7 +51,7 @@ struct DCP_electrical_t {
 
 ///////////////////////////////////////////////////////////////
 
-enum DCP_Errors_e TestConnection(const gpio_num_t pin);
+struct DCP_Transmission_t TestConnection(const gpio_num_t pin);
 struct DCP_timings_t GetTimes(const gpio_num_t pin);
 struct DCP_electrical_t MeasureElectrical(const gpio_num_t pin);
 

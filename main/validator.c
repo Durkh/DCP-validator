@@ -195,7 +195,7 @@ struct DCP_Transmission_t TestConnection(const gpio_num_t pin){
         }
     }
 
-    return ERROR_noTransmission;
+    return (struct DCP_Transmission_t){.errors = ERROR_noTransmission};
 }
 
 ///////////////////////////////////////////////////////////////
