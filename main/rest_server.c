@@ -200,7 +200,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
     AddToJSON(JSON_specConf, "Bit Sync Time", timings.bitSync_low+timings.bitSync_high);
     AddToJSON(JSON_specConf, "Bit Sync High", timings.bitSync_high);
     AddToJSON(JSON_specConf, "Bit Sync Low", timings.bitSync_low);
-    AddToJSON(JSON_specConf, "Bus Yield", yield == COL_false);
+    cJSON_AddItemToObject(JSON_specConf, "Bus Yield", cJSON_CreateBool(yield == COL_false));
 
     //populate electricalInfo
     cJSON* JSON_elec = cJSON_CreateObject();
@@ -225,17 +225,12 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         cJSON_AddItemToObject(JSON_transmission, "Sync", item);
         cJSON_AddItemToObject(item, "status", cJSON_CreateFalse());
 
-        switch (transmission.errors){
-            case ERROR_sync_inf:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Infinite sync signal"));
-            break;
-            case ERROR_sync_tooLong:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too long"));
-            break;
-            case ERROR_sync_tooShort:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too short"));
-            break;
-            default:
+        const char errors[][40] = {"Infinite sync signal", "Sync signal too long", "Sync signal too short"};
+
+        for (int i = 0; i < 3; ++i){
+            if (transmission.errors & (ERROR_sync_inf << i)){
+                cJSON_AddItemToObject(item, "reason", cJSON_CreateString(errors[i]));
+            }
         }
     }else {
         item  = cJSON_CreateObject();
@@ -248,20 +243,12 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         cJSON_AddItemToObject(JSON_transmission, "BitSync", item);
         cJSON_AddItemToObject(item, "status", cJSON_CreateFalse());
 
-        switch (transmission.errors){
-            case ERROR_bitSync_inf:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Infinite bitsync signal"));
-            break;
-            case ERROR_bitSync_tooLong:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("BitSync signal too long"));
-            break;
-            case ERROR_bitSync_tooShort:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("BitSync signal too short"));
-            break;
-            case ERROR_bitSync_invalidLow:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("BitSync signal with invalid low"));
-            break;
-            default:
+        const char errors[][40] = {"Infinite bitsync signal", "BitSync signal too long", "BitSync signal too short", "BitSync signal with invalid low"};
+
+        for (int i = 0; i < 4; ++i){
+            if (transmission.errors & (ERROR_bitSync_inf << i)){
+                cJSON_AddItemToObject(item, "reason", cJSON_CreateString(errors[i]));
+            }
         }
     }else {
         item  = cJSON_CreateObject();
@@ -278,18 +265,14 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         cJSON_AddItemToObject(JSON_transmission, "L3", item);
         cJSON_AddItemToObject(item, "status", cJSON_CreateFalse());
 
-        switch (transmission.errors){
-            case ERROR_sync_inf:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Infinite sync signal"));
-            break;
-            case ERROR_sync_tooLong:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too long"));
-            break;
-            case ERROR_sync_tooShort:
-            cJSON_AddItemToObject(item, "reason", cJSON_CreateString("Sync signal too short"));
-            break;
-            default:
+        const char errors[][40] = {"Invalid header", "invalid Source ID", "invalid padding", "invalid CRC"};
+
+        for (int i = 0; i < 4; ++i){
+            if (transmission.errors & (ERROR_message_invalidL3_header << i)){
+                cJSON_AddItemToObject(item, "reason", cJSON_CreateString(errors[i]));
+            }
         }
+        
     }else {
         item  = cJSON_CreateObject();
         cJSON_AddItemToObject(JSON_transmission, "Sync", item);
