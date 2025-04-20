@@ -2,7 +2,7 @@
 
 const specDelta = [20, 4, 2.5, 1.25];
 const specParameterNames = [
-    "Speed", "Bit High Time", "Bit Low Time", "Sync Time", "Bit Sync Time", "Bit Sync High", "Bit Sync Low", "Bus Yield"
+    "Speed Class", "Bit High Time", "Bit Low Time", "Sync Time", "Bit Sync Time", "Bit Sync High", "Bit Sync Low", "Bus Yield"
 ];
 
 const specDefaultValues = [
@@ -60,7 +60,7 @@ async function fetchReportData() {
             deviceSpeed: parseInt(deviceSpeed.split(' ')[0])
         };
 
-        const response = await fetch('http:/dcp-validator/api/v1/validation', {
+        const response = await fetch('/api/v1/validation', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -75,19 +75,9 @@ async function fetchReportData() {
         //get validation result in the response
         const data = await response.json();
 
-        populateElectricalInfo(data.electricalInfo);
-        populateTransmissionInfo(data.transmissionInfo);
         populateSpecConformity(data.specConformity);
-        
-        // Only show failure details if we have failures
-        const hasFailures = checkForFailures(data);
-        
-        if (hasFailures && data.failureDetails && data.failureDetails.length > 0) {
-            document.querySelector('.failure-details').style.display = 'block';
-            populateFailureDetails(data.failureDetails);
-        } else {
-            document.querySelector('.failure-details').style.display = 'none';
-        }
+        populateTransmissionInfo(data.transmissionInfo);
+        populateElectricalInfo(data.electricalInfo);
 
         document.getElementById('loading-indicator').style.display = 'none';
 
@@ -121,18 +111,22 @@ function checkForFailures(data) {
     return false;
 }
 
+let nErrors = 1;
+
 function populateElectricalInfo(electricalInfo) {
     if (!electricalInfo) return;
 
     const electricalTable = document.getElementById('electrical-info-table').getElementsByTagName('tbody')[0];
     const rows = electricalTable.rows;
 
+    const units = ["V", "V", "μs", "μs", "μs", "KHz"]
+
     for (let i = 0; i < rows.length; i++){
         let cells = rows[i].cells;
 
         const value = electricalInfo[cells[0].textContent];
         if (value !== undefined){
-            cells[1].textContent = value;
+            cells[1].textContent = "".concat(value.toFixed(3), " ", units[i]);
         }
     }
 }
@@ -149,11 +143,15 @@ function populateTransmissionInfo(transmissionInfo) {
         const value = transmissionInfo[cells[0].textContent];
         if (value === undefined) continue;
 
-        cells[1].textContent = value.status ? "Pass": "Fail";
-        cells[1].className = value.status ? "pass": "fail";
+        if (value.status){
+            cells[1].textContent = "Pass";
+            cells[1].className = "pass";
+        }else {
+            cells[1].textContent = "Fail ".concat(nErrors);
+            cells[1].className = "fail";
 
-        if(!value){
-            populateFailureDetails([value.reason]);
+            AppendFailureDetails(value.reason);
+            nErrors++;
         }
     }
 
@@ -203,7 +201,9 @@ function populateSpecConformity(specConformity) {
 
     const specTable = document.getElementById('spec-conformity-table').getElementsByTagName('tbody')[0];
     const rows = specTable.rows;
-    
+
+    const reason = " signal out of range";
+   
     for (let i = 0; i < rows.length; i++){
         let cells = rows[i].cells;
 
@@ -225,7 +225,7 @@ function populateSpecConformity(specConformity) {
 
             return;
         }else {
-            cells[2].textContent = "".concat(value, " ", splits[1]);
+            cells[2].textContent = "".concat(value.toFixed(3), " ", splits[1]);
 
             const v = parseFloat(splits[0]);
         
@@ -233,27 +233,24 @@ function populateSpecConformity(specConformity) {
                 cells[3].textContent = "Pass";
                 cells[3].className = "pass";
             }else{
-                cells[3].textContent = "Fail";
+                cells[3].textContent = "Fail ".concat(nErrors);
                 cells[3].className = "fail";
+            
+                AppendFailureDetails(cells[0].textContent.concat(reason));
+                nErrors++;
             }
         }
     }
 }
 
-function populateFailureDetails(failureDetails) {
-    if (!failureDetails || !failureDetails.length) {
-        const failureList = document.getElementById('failure-list');
-        failureList.innerHTML = '';
-        return;
-    }
+function AppendFailureDetails(detail) {
+    document.querySelector('.failure-details').style.display = 'block';
 
     const failureList = document.getElementById('failure-list');
 
-    failureDetails.forEach(detail => {
-        const li = document.createElement('li');
-        li.textContent = detail;
-        failureList.appendChild(li);
-    });
+    const li = document.createElement('li');
+    li.textContent = detail;
+    failureList.appendChild(li);
 }
 
 function populateDefaultValues() {
@@ -314,7 +311,7 @@ function populateDefaultValues() {
 
 function initializeTablesWithPlaceholders() {
     const electricalParameters = [
-        "VIH (High-level input voltage)", "VIL (Low-level input voltage)",
+        "VIH", "VIL",
         "Rise Time", "Falling Time", "Cycle Time", "Bus Max Speed" 
     ];
 
