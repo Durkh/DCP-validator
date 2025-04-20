@@ -39,8 +39,11 @@ struct DCP_electrical_t MeasureElectrical(const gpio_num_t pin){
 
     taskEXIT_CRITICAL(&criticalMutex);
 
+    ESP_LOGV("Electrical", "th: %lu\ttl: %lu", th, tl);
+
     ret.rise = (double)th/esp_clk_cpu_freq();
     ret.falling = (double)tl/esp_clk_cpu_freq();
+    ESP_LOGV("Electrical", "rise: %f\tfalling: %f", ret.rise, ret.falling);
 
     ret.cycle = ret.rise + ret.falling;
 
@@ -214,20 +217,20 @@ struct DCP_timings_t GetTimes(const gpio_num_t pin){
     );
 
     ret.speed = 0xFF;
-    ret.sync = rawCycles.sync/freqMHz;
-    ret.bitSync_low = rawCycles.bitSync_low/freqMHz;
-    ret.bitSync_high = rawCycles.bitSync_high/freqMHz;
-    ret.bit0 = rawCycles.bit0/freqMHz;
-    ret.bit1 = rawCycles.bit1/freqMHz;
+    ret.sync = (double)rawCycles.sync/freqMHz;
+    ret.bitSync_low = (double)rawCycles.bitSync_low/freqMHz;
+    ret.bitSync_high = (double)rawCycles.bitSync_high/freqMHz;
+    ret.bit0 = (double)rawCycles.bit0/freqMHz;
+    ret.bit1 = (double)rawCycles.bit1/freqMHz;
 
     if(ret.bit0 < 2){
-        ret.speed = ULTRA;
+        ret.speed = 64;
     }else if(ret.bit0 < 3){
-        ret.speed = FAST2;
+        ret.speed = 32;
     }else if(ret.bit0 < 6){
-        ret.speed = FAST1;
+        ret.speed = 20;
     }else if(ret.bit0 < 23){
-        ret.speed = SLOW;
+        ret.speed = 4;
     }
 
     return ret;

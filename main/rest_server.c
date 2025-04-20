@@ -146,10 +146,10 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    cJSON_Delete(root);
-
     bool isController = cJSON_IsTrue(cJSON_GetObjectItem(root, "isController"));
     int deviceSpeed = cJSON_GetObjectItem(root, "deviceSpeed")->valueint;
+
+    cJSON_Delete(root);
 
     unsigned busSpeed = SLOW;
     switch(deviceSpeed){
@@ -193,7 +193,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
     cJSON* JSON_specConf = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "specConformity", JSON_specConf);
 
-    AddToJSON(JSON_specConf, "Speed", timings.speed);
+    AddToJSON(JSON_specConf, "Speed Class", timings.speed);
     AddToJSON(JSON_specConf, "Bit High Time", timings.bit1);
     AddToJSON(JSON_specConf, "Bit Low Time", timings.bit0);
     AddToJSON(JSON_specConf, "Sync Time", timings.sync);
@@ -208,16 +208,16 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
 
     AddToJSON(JSON_elec, "VIH", electrical.VIH);
     AddToJSON(JSON_elec, "VIL", electrical.VIL);
-    AddToJSON(JSON_elec, "Rise Time", electrical.rise);
-    AddToJSON(JSON_elec, "Falling Time", electrical.falling);
-    AddToJSON(JSON_elec, "Cycle Time", electrical.rise + electrical.falling);
-    AddToJSON(JSON_elec, "Bus Max Speed", electrical.speed);
+    AddToJSON(JSON_elec, "Rise Time", electrical.rise * 1e6);
+    AddToJSON(JSON_elec, "Falling Time", electrical.falling * 1e6);
+    AddToJSON(JSON_elec, "Cycle Time", electrical.rise + electrical.falling * 1e6);
+    AddToJSON(JSON_elec, "Bus Max Speed", electrical.speed / 1e3);
 
     //populate transmissionInfo
     cJSON* item;
     cJSON* JSON_transmission = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "transmissionInfo", JSON_transmission);
-    AddToJSON(JSON_transmission, "Transmission Type", transmission.type);
+    AddToJSON(JSON_transmission, "Type", transmission.type);
     
     //sync bitsync size
     if(transmission.errors & (ERROR_sync_inf | ERROR_sync_tooLong | ERROR_sync_tooShort)){
@@ -234,7 +234,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         }
     }else {
         item  = cJSON_CreateObject();
-        cJSON_AddItemToObject(JSON_transmission, "BitSync", item);
+        cJSON_AddItemToObject(JSON_transmission, "Sync", item);
         cJSON_AddItemToObject(item, "status", cJSON_CreateTrue());
     }
 
@@ -252,7 +252,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         }
     }else {
         item  = cJSON_CreateObject();
-        cJSON_AddItemToObject(JSON_transmission, "Sync", item);
+        cJSON_AddItemToObject(JSON_transmission, "BitSync", item);
         cJSON_AddItemToObject(item, "status", cJSON_CreateTrue());
     }
 
@@ -275,7 +275,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         
     }else {
         item  = cJSON_CreateObject();
-        cJSON_AddItemToObject(JSON_transmission, "Sync", item);
+        cJSON_AddItemToObject(JSON_transmission, "L3", item);
         cJSON_AddItemToObject(item, "status", cJSON_CreateTrue());
     }
 
