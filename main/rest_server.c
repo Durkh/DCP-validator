@@ -210,7 +210,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
     AddToJSON(JSON_elec, "VIL", electrical.VIL);
     AddToJSON(JSON_elec, "Rise Time", electrical.rise * 1e6);
     AddToJSON(JSON_elec, "Falling Time", electrical.falling * 1e6);
-    AddToJSON(JSON_elec, "Cycle Time", electrical.rise + electrical.falling * 1e6);
+    AddToJSON(JSON_elec, "Cycle Time", (electrical.rise + electrical.falling) * 1e6);
     AddToJSON(JSON_elec, "Bus Max Speed", electrical.speed / 1e3);
 
     //populate transmissionInfo

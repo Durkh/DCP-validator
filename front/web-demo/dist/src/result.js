@@ -75,6 +75,9 @@ async function fetchReportData() {
         //get validation result in the response
         const data = await response.json();
 
+        const failureList = document.getElementById('failure-list');
+        failureList.innerHTML = '';
+
         populateSpecConformity(data.specConformity);
         populateTransmissionInfo(data.transmissionInfo);
         populateElectricalInfo(data.electricalInfo);
